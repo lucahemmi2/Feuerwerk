@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raketen-Editor</title>
+    <link rel="stylesheet" href="stylesheet.css">
+</head>
+
+<body>
+    <h1>Raketen-Editor</h1>
+
+    <div id="editor" class="editor-container">
+        <!-- Linke Seite: Einstellungsoptionen -->
+        <section id="rocket-settings">
+            <h2>Einstellungen</h2>
+            <form id="rocketForm">
+                <label for="rocketSize">Explosionsradius:</label>
+                <input type="range" id="rocketSize" name="rocketSize" min="7" max="150" value="40">
+
+                <label for="rocketColor">Primärfarbe:</label>
+                <input type="color" id="rocketColor" name="rocketColor" value="#ff0000">
+
+                <label for="rocketColorSecondary">Sekundärfarbe:</label>
+                <input type="color" id="rocketColorSecondary" name="rocketColorSecondary" value="#ffffff">
+
+                <label for="rocketParticles">Partikelanzahl:</label>
+                <input type="range" id="rocketParticles" name="rocketParticles" min="5" max="350" value="200">
+
+                <label for="rocketRadius">Partikelgröße:</label>
+                <input type="range" id="rocketRadius" name="rocketRadius" min="1" max="100" value="25">
+
+                <label for="rocketSecondaryParticles">Sekundäre Partikel:</label>
+                <input type="range" id="rocketSecondaryParticles" name="rocketSecondaryParticles" min="0" max="16" value="3">
+
+                <label for="rocketShape">Explosionstyp:</label>
+                <select id="rocketShape">
+                    <option value="circle">Kreis</option>
+                    <option value="heart">Herz</option>
+                    <option value="star">Stern</option>
+                </select>
+
+                <button type="submit">Rakete speichern</button>
+            </form>
+        </section>
+
+        <!-- Mitte: Live-Vorschau -->
+        <section id="rocket-preview">
+            <h2>Vorschau</h2>
+            <canvas id="previewCanvas" width="850" height="550" style="border:5px solid #ffffff;"></canvas>
+        </section>
+
+        <!-- Rechte Seite: Tabelle aller Raketen -->
+        <section id="rocket-list">
+            <h2>Gespeicherte Raketen</h2>
+            <table>
+                <tbody id="rocketTableBody"></tbody>
+            </table>
+        </section>
+    </div>
+
+    <script type="module" src="./compiled/main.js" defer></script>
+    <script type="module" src="./compiled/rocketEditor.js" defer></script>
+
+    <button id="backToSimulator">Zurück zum Simulator</button>
+</body>
+
+</html>
