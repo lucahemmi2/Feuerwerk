@@ -1,89 +1,102 @@
+import { Effects } from "./effects.js"; // Effects importieren
+import { ExplosionShapes } from "./shapes.js"; // ExplosionShapes importieren
 export class RocketPreview {
     constructor(canvasId) {
         this.particles = [];
-        this.size = 50;
+        this.size = 3;
+        this.explosionRadius = 50;
+        this.particlesCount = 100;
         this.color1 = "#ff0000";
         this.color2 = "#ffff00";
-        this.particlesCount = 100;
-        this.animationRunning = false;
-        this.secondaryParticlesCount = 4;
-        this.explosionRadius = 50; // Standardwert für den Radius
+        this.shape = "circle";
+        this.rocketName = "";
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext("2d");
+        this.effects = new Effects();
     }
-    updatePreview(size, color1, color2, particles, secondaryParticles, radius) {
+    // Methode für die Explosion bei Klicks
+    explodeAt(x, y, name, size, color1, color2, particles, secondaryParticles, radius, shape) {
+        this.rocketName = name;
         this.size = size;
         this.color1 = color1;
         this.color2 = color2;
         this.particlesCount = particles;
-        this.secondaryParticlesCount = secondaryParticles;
-        this.explosionRadius = radius; // Speichert den Radius-Wert
-        this.startAnimation(); // Starte eine Explosion neu
+        this.shape = shape;
+        if (this.shape === "heart") {
+            this.explosionRadius = this.getRandomInRange(0.001, 20);
+        }
+        else if (this.shape === "star") {
+            this.explosionRadius = this.getRandomInRange(50, 200);
+        }
+        else {
+            this.explosionRadius = radius;
+        }
+        this.startAnimation(x, y, secondaryParticles); // Starte die Animation an der geklickten Position
     }
-    startAnimation() {
-        this.particles = []; // Reset Partikel-Array
+    // Aktualisiere die Vorschau
+    updatePreview(name, size, color1, color2, particles, secondaryParticles, radius, shape) {
+        this.rocketName = name;
+        this.size = size;
+        this.color1 = color1;
+        this.color2 = color2;
+        this.particlesCount = particles;
+        this.shape = shape;
+        if (this.shape === "heart") {
+            this.explosionRadius = this.getRandomInRange(0.001, 20);
+        }
+        else if (this.shape === "star") {
+            this.explosionRadius = this.getRandomInRange(50, 200);
+        }
+        else {
+            this.explosionRadius = radius;
+        }
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        this.startAnimation(centerX, centerY, secondaryParticles); // Starte die Animation in der Mitte
+    }
+    getRandomInRange(min, max) {
+        return Math.random() * (max - min) + min;
+    }
+    // Starte die Animation an einer bestimmten Position
+    startAnimation(x, y, secondaryParticles) {
+        this.particles = [];
+        let particlePositions;
+        if (this.shape === "heart") {
+            particlePositions = ExplosionShapes.generateParticles("heart", x, y, this.explosionRadius);
+        }
+        else {
+            particlePositions = ExplosionShapes.generateParticles(this.shape, x, y, this.explosionRadius);
+        }
         for (let i = 0; i < this.particlesCount; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const speed = (Math.random() * 2 + 1) * (this.explosionRadius / 50); // Geschwindigkeit basiert auf Radius
+            const pos = particlePositions[i % particlePositions.length];
+            const angle = Math.random() * 2 * Math.PI;
+            const speed = Math.random() * 3 + 1;
             this.particles.push({
-                x: this.canvas.width / 2,
-                y: this.canvas.height / 2,
+                x: pos.x,
+                y: pos.y,
                 vx: Math.cos(angle) * speed,
                 vy: Math.sin(angle) * speed,
                 color: Math.random() > 0.5 ? this.color1 : this.color2,
                 alpha: 1,
-                isSecondary: false
+                size: this.size
             });
         }
-        if (!this.animationRunning) {
-            this.animationRunning = true;
-            this.animate();
-        }
+        this.animate();
     }
+    // Animationsschleife
     animate() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.particles.forEach((particle, index) => {
-            particle.x += particle.vx;
-            particle.y += particle.vy;
-            particle.alpha -= 0.025;
-            if (particle.alpha <= 0) {
-                if (!particle.isSecondary) {
-                    this.generateSecondaryParticles(particle.x, particle.y);
-                }
-                this.particles.splice(index, 1);
-            }
+        this.particles = this.particles.filter(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vx *= 0.98;
+            p.vy *= 0.98;
+            p.alpha -= 0.01;
+            return p.alpha > 0;
         });
-        this.drawParticles();
+        this.effects.drawParticles(this.ctx, this.particles);
         if (this.particles.length > 0) {
             requestAnimationFrame(() => this.animate());
         }
-        else {
-            this.animationRunning = false;
-        }
-    }
-    generateSecondaryParticles(x, y) {
-        for (let i = 0; i < this.secondaryParticlesCount; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const speed = (Math.random() * 2 + 1) * (this.explosionRadius / 50); // Geschwindigkeit basiert auf Radius
-            this.particles.push({
-                x: x,
-                y: y,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed,
-                color: Math.random() > 0.5 ? this.color1 : this.color2,
-                alpha: 1,
-                isSecondary: true
-            });
-        }
-    }
-    drawParticles() {
-        this.particles.forEach((particle) => {
-            this.ctx.globalAlpha = particle.alpha;
-            this.ctx.fillStyle = particle.color;
-            this.ctx.beginPath();
-            this.ctx.arc(particle.x, particle.y, this.size / 10, 0, Math.PI * 2);
-            this.ctx.fill();
-        });
-        this.ctx.globalAlpha = 1;
     }
 }

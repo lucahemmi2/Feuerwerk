@@ -1,96 +1,44 @@
 import { RocketPreview } from './rocketPreview.js';
-import MingiDB from 'https://github.com/JirkaDellOro/MingiDB';
+import { saveRocket, loadRockets, displayRockets, deleteRocket } from './storage.js';
 
-// Typ für Raketenobjekte
-interface Rocket {
-    _id?: string;
-    name: string;
-    size: number;
-    radius: number;
-    secondaryParticles: number;
-    shape: string;
-}
-
-// Initialisierung der Datenbank
-const db = new MingiDB('fireworkDB');
-db.collection<Rocket>('rockets');
 
 document.addEventListener("DOMContentLoaded", () => {
-    const rocketForm = document.getElementById("rocketForm") as HTMLFormElement;
-    const previewCanvas = document.getElementById("previewCanvas") as HTMLCanvasElement;
-    const previewCtx = previewCanvas.getContext("2d");
-    const rocketTable = document.getElementById("rocketTableBody") as HTMLTableElement;
-
-    // Event Listener für das Formular
-    rocketForm.addEventListener("submit", (event) => {
-        event.preventDefault();
-        saveRocket();
-    });
-
-    function saveRocket() {
-        const formData = new FormData(rocketForm);
-        const rocketData: Rocket = {
-            name: formData.get("rocketName") as string,
-            size: Number(formData.get("rocketSize")),
-            radius: Number(formData.get("rocketRadius")),
-            secondaryParticles: Number(formData.get("rocketSecondaryParticles")),
-            shape: formData.get("rocketShape") as string
-        };
-        
-        db.collection<Rocket>('rockets').insert(rocketData);
-        renderRocketTable();
+    const editorContainer = document.getElementById("editor");
+    if (!editorContainer) {
+        console.error("Editor-Container nicht gefunden");
+        return;
     }
 
-    function renderRocketTable() {
-        rocketTable.innerHTML = "";
-        const rockets: Rocket[] = db.collection<Rocket>('rockets').find();
-        
-        rockets.forEach((rocket: Rocket) => {
-            const row = rocketTable.insertRow();
-            row.insertCell(0).textContent = rocket.name;
-            row.insertCell(1).textContent = rocket.size.toString();
-            row.insertCell(2).textContent = rocket.radius.toString();
-            row.insertCell(3).textContent = rocket.secondaryParticles.toString();
-            row.insertCell(4).textContent = rocket.shape;
-
-            const deleteButton = document.createElement("button");
-            deleteButton.textContent = "Löschen";
-            deleteButton.addEventListener("click", () => {
-                if (rocket._id) {
-                    db.collection<Rocket>('rockets').remove({ _id: rocket._id });
-                }
-                renderRocketTable();
-            });
-            row.insertCell(5).appendChild(deleteButton);
-        });
-    }
-    
-    renderRocketTable();
+    // Initialisiere den RocketEditor
+    new RocketEditor(editorContainer);
 });
 
 export class RocketEditor {
-    private container: HTMLElement;
     private rocketPreview: RocketPreview | null = null;
 
     constructor(container: HTMLElement) {
-        this.container = container;
         this.initialize();
     }
 
-    private initialize() {
+    async initialize() {
         const canvas = document.getElementById('previewCanvas') as HTMLCanvasElement;
         if (canvas) {
             this.rocketPreview = new RocketPreview('previewCanvas');
             this.setupInputs();
             this.updatePreview();
-            this.setupNavigation();
+            this.toggleSettings();
+
+            // Lade gespeicherte Raketen und zeige sie an
+            const rockets = await loadRockets();
+            displayRockets(rockets);
         } else {
-            console.error("Canvas für RocketPreview wurde nicht gefunden!");
+            console.error("Canvas nicht gefunden");
         }
     }
 
     private setupInputs() {
         const inputIds = [
+            "rocketName",
             "rocketSize",
             "rocketRadius",
             "rocketParticles",
@@ -101,30 +49,109 @@ export class RocketEditor {
         ];
 
         inputIds.forEach(id => {
-            const input = document.getElementById(id) as HTMLInputElement | null;
+            const input = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
             if (input) {
                 input.addEventListener("input", () => this.updatePreview());
             }
         });
+
+        // Event-Listener für das Formular
+        const rocketForm = document.getElementById("rocketForm") as HTMLFormElement | null;
+        if (rocketForm) {
+            rocketForm.addEventListener("submit", async (event) => {
+                event.preventDefault();
+
+                // Erstelle das Rocket-Objekt mit allen Werten aus den Eingabefeldern
+                const rocketData = {
+                    name: (document.getElementById("rocketName") as HTMLInputElement).value,
+                    size: Number((document.getElementById("rocketSize") as HTMLInputElement).value),
+                    radius: Number((document.getElementById("rocketRadius") as HTMLInputElement).value),
+                    particles: Number((document.getElementById("rocketParticles") as HTMLInputElement).value),
+                    secondaryParticles: Number((document.getElementById("rocketSecondaryParticles") as HTMLInputElement).value),
+                    color1: (document.getElementById("rocketColor") as HTMLInputElement).value,
+                    color2: (document.getElementById("rocketColorSecondary") as HTMLInputElement).value,
+                    shape: (document.getElementById("rocketShape") as HTMLSelectElement).value
+                };
+
+                await saveRocket(rocketData); // Rocket-Objekt an saveRocket() übergeben
+            });
+
+        }
+    }
+
+    private toggleSliders(shape: string) {
+        const radiusSlider = document.getElementById("rocketRadius") as HTMLInputElement;
+        const secondaryParticlesSlider = document.getElementById("rocketSecondaryParticles") as HTMLInputElement;
+        const radiusLabel = document.querySelector("label[for='rocketRadius']") as HTMLLabelElement;
+        const secondaryParticlesLabel = document.querySelector("label[for='rocketSecondaryParticles']") as HTMLLabelElement;
+
+        if (shape === "heart" || shape === "star") {
+            radiusSlider.style.display = "none";
+            secondaryParticlesSlider.style.display = "none";
+            radiusLabel.style.display = "none";
+            secondaryParticlesLabel.style.display = "none";
+        } else {
+            radiusSlider.style.display = "block";
+            secondaryParticlesSlider.style.display = "block";
+            radiusLabel.style.display = "block";
+            secondaryParticlesLabel.style.display = "block";
+        }
+    }
+
+    private toggleSettings() {
+        const settingsSection = document.getElementById("rocket-settings");
+        const backToSimulatorButton = document.getElementById("backToSimulator");
+        const canvas = document.getElementById("previewCanvas") as HTMLCanvasElement;
+    
+        if (settingsSection && backToSimulatorButton && canvas) {
+            backToSimulatorButton.addEventListener("click", () => {
+                if (settingsSection.style.display === "none" || settingsSection.style.display === "") {
+                    // Einstellungen einblenden und Canvas verkleinern
+                    settingsSection.style.display = "block";
+                    canvas.width = 800; // Standardgröße oder deine ursprüngliche Breite
+                    canvas.height = 600; // Standardgröße oder deine ursprüngliche Höhe
+                } else {
+                    // Einstellungen ausblenden und Canvas vergrößern
+                    settingsSection.style.display = "none";
+                    canvas.width = 1200; // Neue Breite
+                    canvas.height = 1500; // Neue Höhe
+                }
+    
+                // Aktualisiere die Vorschau, falls nötig
+                if (this.rocketPreview) {
+                    this.rocketPreview.updatePreview(
+                        (document.getElementById("rocketName") as HTMLInputElement).value,
+                        Number((document.getElementById("rocketSize") as HTMLInputElement).value),
+                        (document.getElementById("rocketColor") as HTMLInputElement).value,
+                        (document.getElementById("rocketColorSecondary") as HTMLInputElement).value,
+                        Number((document.getElementById("rocketParticles") as HTMLInputElement).value),
+                        Number((document.getElementById("rocketSecondaryParticles") as HTMLInputElement).value),
+                        Number((document.getElementById("rocketRadius") as HTMLInputElement).value),
+                        (document.getElementById("rocketShape") as HTMLSelectElement).value
+                    );
+                }
+            });
+        } 
     }
 
     private updatePreview() {
         if (!this.rocketPreview) return;
 
-        const size = parseInt((document.getElementById("rocketSize") as HTMLInputElement).value);
-        const radius = parseInt((document.getElementById("rocketRadius") as HTMLInputElement).value);
-        const particles = parseInt((document.getElementById("rocketParticles") as HTMLInputElement).value);
-        const secondaryParticles = parseInt((document.getElementById("rocketSecondaryParticles") as HTMLInputElement).value);
+        const name = (document.getElementById("rocketName") as HTMLInputElement).value;
+        const size = Number((document.getElementById("rocketSize") as HTMLInputElement).value);
+        const radius = Number((document.getElementById("rocketRadius") as HTMLInputElement).value);
+        const particles = Number((document.getElementById("rocketParticles") as HTMLInputElement).value);
+        const secondaryParticles = Number((document.getElementById("rocketSecondaryParticles") as HTMLInputElement).value);
         const color1 = (document.getElementById("rocketColor") as HTMLInputElement).value;
         const color2 = (document.getElementById("rocketColorSecondary") as HTMLInputElement).value;
         const shape = (document.getElementById("rocketShape") as HTMLSelectElement).value;
 
-        this.rocketPreview.updatePreview(size, color1, color2, particles, secondaryParticles, radius, shape);
-    }
+        // Slider je nach Shape-Auswahl ausblenden
+        this.toggleSliders(shape);
 
-    private setupNavigation() {
-        document.getElementById("backToSimulator")?.addEventListener("click", () => {
-            window.location.href = "index.html";
-        });
+        // Live-Preview aktualisieren mit Übergabe der Benutzerdefinierten Werte
+        this.rocketPreview.updatePreview(name, size, color1, color2, particles, secondaryParticles, radius, shape);
+
     }
 }
+
